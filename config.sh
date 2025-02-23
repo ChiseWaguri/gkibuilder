@@ -8,7 +8,7 @@ GKI_VERSION="android12-5.10"
 
 # Build variables
 export TZ="Asia/Jakarta"
-export KBUILD_BUILD_USER="eraselk"
+export KBUILD_BUILD_USER="chise"
 export KBUILD_BUILD_HOST="$KERNEL_NAME"
 export KBUILD_BUILD_TIMESTAMP=$(date)
 
