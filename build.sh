@@ -286,6 +286,7 @@ fi
 
 cd $HOME/common
 # Apply config for KernelSU manual hook (Need supported source on both kernel and KernelSU)
+log "Applying manual hook-related changes we are now in $(pwd)"
 if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
     [[ $USE_KSU_OFC == "true" ]] && (
         error "Official KernelSU drop manual hook support"
