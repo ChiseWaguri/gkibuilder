@@ -94,14 +94,14 @@ config() {
 
 # Logging function
 log() {
-    echo -e "[\e[32mLOG\e[0m] $1" | tee -a $HOME/log.txt
-}
-error() {
-    echo -e "\e[31m[ERROR]\e[0m $1" | tee -a $HOME/log.txt
-    upload_file $HOME/log.txt
-    exit 1
+    echo -e "\e[32m[LOG]\e[0m] $*" | tee -a "$HOME/build.log"
 }
 
+error() {
+    echo -e "\e[31m[ERROR]\e[0m] $*" | tee -a "$HOME/build.log"
+    upload_file "$HOME/build.log"
+    exit 1
+}
 # ---------------
 # 	MAIN
 # ---------------
@@ -110,16 +110,20 @@ error() {
 cd
 
 # Kernel patches source
+log "Downloading kernel patch from (ChiseWaguri/kernel-patches) to ~/chise_patches"
 git clone --depth=1 https://github.com/ChiseWaguri/kernel-patches chise_patches
+log "Downloading kernel patch from (WildPlusKernel/kernel-patches) to ~/wildplus_patches"
 git clone --depth=1 https://github.com/WildPlusKernel/kernel_patches wildplus_patches
 # Kernel source
-git clone --depth=1 $KERNEL_REPO -b $KERNEL_BRANCH common
+log "Cloning kernel source from from ($KERNEL_REPO) to ~/common"
+git clone --depth=1 https://github.com/$KERNEL_REPO -b $KERNEL_BRANCH common
 
 # Extract kernel version
 cd $HOME/common
 KERNEL_VERSION=$(make kernelversion)
 
 # Initialize VARIANT to "none" by default
+log "Setting KernelSU variant..."
 VARIANT="none"
 
 # Define an array of possible variants
@@ -161,17 +165,20 @@ CLANG_INFO="$CLANG_URL"
 if [[ "$CLANG_URL" != *.tar.* && -n "$CUSTOM_CLANG_BRANCH" ]]; then
     CLANG_INFO+=" | $CUSTOM_CLANG_BRANCH"
 fi
+log "Clang used is $CLANG_INFO..."
 
 # Check if Clang is already installed
 CLANG_PATH="$HOME/tc"
 
 if [[ ! -x $CLANG_PATH/bin/clang || ! -f $CLANG_PATH/VERSION || "$(cat $CLANG_PATH/VERSION)" != "$CLANG_INFO" ]]; then
+    log "Cache of $CLANG_INFO is not found."
     log "🔽 Downloading Clang from $CLANG_INFO..."
     rm -rf "$CLANG_PATH" && mkdir -p "$CLANG_PATH"
 
     if [[ "$USE_AOSP_CLANG" == "true" || "$CLANG_URL" == *.tar.* ]]; then
         wget -qO clang-tarball "$CLANG_URL" && tar -xf clang-tarball -C "$CLANG_PATH/" && rm clang-tarball
     else
+        log "🔽 Downloading Clang from $CLANG_INFO..."
         git clone --depth=1 --branch "$CUSTOM_CLANG_BRANCH" "$CLANG_URL" "$CLANG_PATH"
     fi
 
@@ -207,6 +214,7 @@ COMPILER_STRING=$(clang -v 2>&1 | head -n 1 | sed 's/(https..*//' | sed 's/ vers
 
 # Apply LineageOS maphide patch (thanks to @backslashxx and @WildPlusKernel)
 cd $HOME/common
+log "Patching LineageOS maphide patch..."
 if ! patch -p1 < $HOME/wildplus_patches/69_hide_stuff.patch; then
     log "Patch rejected. Reverting patch..."
     mv fs/proc/task_mmu.c.orig fs/proc/task_mmu.c || true
@@ -214,6 +222,7 @@ if ! patch -p1 < $HOME/wildplus_patches/69_hide_stuff.patch; then
 fi
 
 # Apply extra tmpfs config
+log "Applying extra tmpfs config..."
 config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_TMPFS_XATTR
 config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_TMPFS_POSIX_ACL
 
@@ -221,6 +230,7 @@ config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_TMPFS_POSIX_A
 # Remove KernelSU in driver in kernel source if exist
 cd $HOME/common
 if [[ $USE_KSU == true ]]; then
+    log "KernelSU driver found! Removing KernelSU in driver in kernel source..."
     if [ -d drivers/staging/kernelsu ]; then
         sed -i '/kernelsu/d' drivers/staging/Kconfig
         sed -i '/kernelsu/d' drivers/staging/Makefile
@@ -239,6 +249,7 @@ fi
 # Install KernelSU driver
 cd
 if [[ $USE_KSU == true ]]; then
+    log "Installing KernelSU..."
     [[ $USE_KSU_OFC == true ]] && install_ksu tiann/KernelSU
     [[ $USE_KSU_RKSU == true ]] && install_ksu rsuntk/KernelSU $([[ $USE_KSU_SUSFS == true ]] && echo "susfs-v1.5.5" || echo "main")
     [[ $USE_KSU_NEXT == true ]] && install_ksu rifsxd/KernelSU-Next $([[ $USE_KSU_SUSFS == true ]] && echo "next-susfs" || echo "next")
@@ -249,38 +260,37 @@ fi
 if [[ $USE_KSU_SUSFS == "true" ]] && [[ $USE_KSU != "true" ]]; then
     error "You can't use SuSFS without KSU enabled!"
 elif [[ $USE_KSU == "true" ]] && [[ $USE_KSU_SUSFS == "true" ]]; then
+    log "Cloning susfs4ksu..."
     git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu -b gki-$GKI_VERSION $HOME/susfs4ksu
     SUSFS_PATCHES="$HOME/susfs4ksu/kernel_patches"
 
-    # Copy header files (Kernel Side)
-    cd common
+    # Copy susfs files (Kernel Side)
+    log "Copying susfs files..."
+    cd $HOME/common
     cp $SUSFS_PATCHES/include/linux/* ./include/linux/
     cp $SUSFS_PATCHES/fs/* ./fs/
     SUSFS_VERSION=$(grep -E '^#define SUSFS_VERSION' ./include/linux/susfs.h | cut -d' ' -f3 | sed 's/"//g')
 
     # Apply kernel-side susfs patch
+    log "Patching kernel-side susfs patch"
     if ! patch -p1 < "$SUSFS_PATCHES/50_add_susfs_in_gki-$GKI_VERSION.patch" 2>&1 | tee ./patch.log; then
-        grep -q "*FAILED*fs/devpts/inode.c*" ./patch.log || error "❌ Patch failed (not due to fs/devpts/inode.c)."
-
+        grep -q "*FAILED*fs/devpts/inode.c*" ./patch.log || error "❌ Patch failed (not due to legacy KSU manual hook)."
         log "⚠️ Kernel susfs patch failed on fs/devpts/inode.c."
-        [[ $KSU_USE_MANUAL_HOOK == "true" ]] && log "⏩ Using manual hook, skipping fix." && rm -f ./patch.log && exit 0
-
-        if grep -q "CONFIG_KSU_MANUAL_HOOK" fs/devpts/inode.c; then
-            log "🔧 Applying inode.c fix..."
-            patch -p1 < "$HOME/chise_patches/inode.c_fix.patch" || error "❌ inode.c fix patch failed."
-        elif grep -q "CONFIG_KSU" fs/devpts/inode.c; then
-            error "⚠️ CONFIG_KSU guard detected. Unsupported."
-        else
-            error "❌ Manual hook code missing or unknown guard."
+        if [[ $KSU_USE_MANUAL_HOOK != "true" ]]; then
+            # WIP. this will be uncommented later... or never...
+            # patch -p1 /path/to/devpts_fix.patch || error "Fix patch failed."
+            error "❌ Your kernel-source is using manual hook but you dont enable it, sus_su would not work. exiting..."
         fi
-    fi
 
+        log "⏩ Using manual hook, skipping patching."
+    fi
     rm -f ./patch.log
 
     # Apply patch to KernelSU (KSU Side)
     if [[ $USE_KSU_OFC == "true" ]]; then
         cd ../KernelSU
-        patch -p1 < $SUSFS_PATCHES/KernelSU/10_enable_susfs_for_ksu.patch || error "KernelSU susfs patch failed."
+        log "Applying KernelSU-side susfs patch"
+        patch -p1 < $SUSFS_PATCHES/KernelSU/10_enable_susfs_for_ksu.patch || error "KernelSU-side susfs patch failed."
     fi
 fi
 
@@ -289,14 +299,17 @@ cd $HOME/common
 log "Applying manual hook-related changes we are now in $(pwd)"
 if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
     [[ $USE_KSU_OFC == "true" ]] && (
-        error "Official KernelSU drop manual hook support"
+        error "Official KernelSU has dropped manual hook support. exiting..."
     )
-    if ! grep -qE "CONFIG_KSU|CONFIG_KSU_MANUAL_HOOK" fs/exec.c; then
-        ## WIP. will be uncommented later... or never
-        # patch -p1 $HOME/chise_patches/ksu_manualhook.patch
-        error "Your kernel source does not support manual hook for KernelSU"
+    log "Patching manual-hook code to kernel source"
+    if ! patch -p1 < "$HOME/wildplus_patches/new_hooks.patch"; then
+        log "❌ Manual hook patch rejected. Reverting changes..."
+        mv -f fs/{exec,open,read_write,stat}.c.orig fs/ 2>/dev/null || true
+        mv -f drivers/input/input.c.orig drivers/input/ 2>/dev/null || true
+        mv -f drivers/tty/pty.c.orig drivers/tty/ 2>/dev/null || true
     fi
     config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_KSU_MANUAL_HOOK
+    config --file arch/arm64/configs/$KERNEL_DEFCONFIG --disable CONFIG_KSU_WITH_KPROBE
     config --file arch/arm64/configs/$KERNEL_DEFCONFIG --disable CONFIG_KSU_SUSFS_SUS_SU
 fi
 
@@ -340,54 +353,47 @@ KERNEL_IMAGE=$HOME/out/arch/arm64/boot/Image
 # Build GKI
 cd "$HOME/common"
 
-if [[ $BUILD_KERNEL == "true" ]]; then
+build_kernel() {
     log "Building kernel..."
-    set +e
-    {
-        # Run defconfig
-        make $MAKE_ARGS $KERNEL_DEFCONFIG
+    set -x  # Enable debugging
 
-        # Disable module builds if needed
-        if [[ $BUILD_LKMS != "true" ]]; then
-            sed -i 's/=m/=n/g' "$HOME/out/.config"
-        fi
+    make $MAKE_ARGS $KERNEL_DEFCONFIG || error "❌ Generating defconfig from $KERNELDEFCONFIG failed!"
+    
+    if [[ $BUILD_LKMS != "true" ]]; then
+        sed -i 's/=m/=n/g' "$HOME/out/.config"
+    fi
 
-        # Merge additional config files if provided
-        if [[ -n "$DEFCONFIGS" ]]; then
-            for CONFIG in $DEFCONFIGS; do
-                echo "Merging $CONFIG..."
-                make $MAKE_ARGS scripts/kconfig/merge_config.sh $CONFIG
-            done
-        fi
+    # Merge additional configs
+    if [[ -n "$DEFCONFIGS" ]]; then
+        for CONFIG in $DEFCONFIGS; do
+            make $MAKE_ARGS scripts/kconfig/merge_config.sh $CONFIG || error "❌ Config merge failed!"
+        done
+    fi
 
-        # Ensure configuration is valid
-        make $MAKE_ARGS olddefconfig
+    # Ensure valid config
+    make $MAKE_ARGS olddefconfig || error "❌ olddefconfig failed!"
 
-        # Build Kernel Image(s)
-        build_targets="Image"
-        if [[ $STATUS == "STABLE" || $BUILD_BOOTIMG == "true" ]]; then
-            build_targets+=" Image.lz4 Image.gz"
-        fi
-        make $MAKE_ARGS -j$(nproc --all) \
-            $build_targets
-
-    } 2>&1 | tee -a "$HOME/build.log"
-    set -e
-
-elif [[ $GENERATE_DEFCONFIG == "true" ]]; then
-    log "Generating defconfig..."
-    make $MAKE_ARGS $KERNEL_DEFCONFIG
+    if [[ $GENERATE_DEFCONFIG == "true" ]]; then
+    log "Uploading defconfig..."
     upload_file $HOME/out/.config
     exit 0
-fi
+    fi
 
-cd ..
+    # Build the actual kernel
+    build_targets="Image"
+    [[ $STATUS == "STABLE" || $BUILD_BOOTIMG == "true" ]] && build_targets+=" Image.lz4 Image.gz"
+
+    make $MAKE_ARGS -j$(nproc --all) $build_targets || error "❌ Kernel build failed!"
+    
+    set +x  # Disable debugging after the function
+}
+
+build_kernel | tee -a "$HOME/build.log"
+
 if [[ ! -f $KERNEL_IMAGE ]]; then
     send_msg "❌ Build failed!"
     # Upload log and config for debugging
-    echo "# Begin build log" >> $HOME/log.txt
-    cat $HOME/build.log >> $HOME/log.txt
-    upload_file "out/.config"
+    upload_file "$HOME/out/.config"
     error "Kernel Image does not exist at $KERNEL_IMAGE"
 fi
 
@@ -429,6 +435,7 @@ if [[ $STATUS == "STABLE" ]] || [[ $BUILD_BOOTIMG == "true" ]]; then
         local output="$2"
 
         # Create boot image
+        log "Creating the boot image"
         $MKBOOTIMG --header_version 4 \
             --kernel "$kernel" \
             --output "$output" \
@@ -439,6 +446,7 @@ if [[ $STATUS == "STABLE" ]] || [[ $BUILD_BOOTIMG == "true" ]]; then
         sleep 1
 
         # Sign the boot image
+        log "Signing the boot image..."
         $AVBTOOL add_hash_footer \
             --partition_name boot \
             --partition_size $((64 * 1024 * 1024)) \
@@ -484,6 +492,7 @@ fi
 
 # Zipping
 cd anykernel
+log "Zipping anykernel..."
 cp $KERNEL_IMAGE .
 zip -r9 $HOME/$ZIP_NAME ./*
 cd ..
@@ -510,6 +519,7 @@ if [[ $STATUS == "STABLE" ]] || [[ $UPLOAD2GH == "true" ]]; then
 
     # Create release
     cd "$HOME/rel"
+    log "Creating GitHub release..."
     gh release create "$TAG" -t "$RELEASE_MESSAGE" || {
         error "❌ Failed to create release"
     }
@@ -517,6 +527,7 @@ if [[ $STATUS == "STABLE" ]] || [[ $UPLOAD2GH == "true" ]]; then
     sleep 2
 
     # Upload files to release
+    log "Uploading files to release..."
     for release_file in $HOME/*.zip $HOME/*.img; do
         [[ -f "$release_file" ]] || continue
         gh release upload "$TAG" "$release_file" || {

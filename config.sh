@@ -17,7 +17,7 @@ ANYKERNEL_REPO="https://github.com/hazepynut/anykernel"
 ANYKERNEL_BRANCH="gki"
 
 # Kernel
-KERNEL_REPO="https://github.com/chisewaguri/android_kernel_xiaomi_marble"
+KERNEL_REPO="chisewaguri/android_kernel_xiaomi_marble"
 KERNEL_BRANCH="ksu-susfs"
 KERNEL_DEFCONFIG="marble_defconfig"
 # Defconfigs would be merged in the compiling processes
