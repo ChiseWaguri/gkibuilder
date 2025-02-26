@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-set -e
-
-required_vars=("CHAT_ID" "TOKEN" "GH_TOKEN")
-
-for var in "${required_vars[@]}"; do
-    if [[ -z ${!var:-} ]]; then
-        error "$var is not set!"
-    fi
-done
 
 # ------------------
 # Functions
@@ -90,16 +81,27 @@ error() {
     exit 1
 }
 
+# Check for required variables
+set -e
+
+required_vars=("CHAT_ID" "TOKEN" "GH_TOKEN")
+
+for var in "${required_vars[@]}"; do
+    if [[ -z ${!var:-} ]]; then
+        error "$var is not set!"
+    fi
+done
+
 # ---------------
 # 	MAIN
 # ---------------
 
+# Import configuration
+source ./config.sh
+
 # Make sure we are on home directory
 log "Go to $HOME"
 cd $HOME
-
-# Import configuration
-source $HOME/config.sh
 
 # Set up timezone
 sudo timedatectl set-timezone $TZ
