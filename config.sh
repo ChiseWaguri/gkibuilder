@@ -18,7 +18,7 @@ ANYKERNEL_BRANCH="gki"
 
 # Kernel
 KERNEL_REPO="chisewaguri/android_kernel_xiaomi_marble"
-KERNEL_BRANCH="melt-rebase"
+KERNEL_BRANCH="ksu-test"
 KERNEL_DEFCONFIG="marble_defconfig"
 # Defconfigs would be merged in the compiling processes
 DEFCONFIGS_EXAMPLE="
