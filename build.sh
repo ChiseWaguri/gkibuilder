@@ -301,14 +301,14 @@ if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
     )
     if grep -q "CONFIG_KSU" fs/exec.c; then
         log "Manual hook codes found in fs/exec.c..."
-    # Your code here
     else
-        log "Patching manual-hook code to the kernel source"
-        if ! patch -p1 < "$HOME/wildplus_patches/new_hooks.patch"; then
-            log "❌ Manual hook patch rejected. Reverting changes..."
-            mv -f fs/{exec,open,read_write,stat}.c.orig fs/ 2>/dev/null || true
-            mv -f drivers/input/input.c.orig drivers/input/ 2>/dev/null || true
-            mv -f drivers/tty/pty.c.orig drivers/tty/ 2>/dev/null || true
+        log "Patching manual-hook code to the the kernel source..."
+            if ! patch -p1 < "$HOME/wildplus_patches/new_hooks.patch"; then
+                log "❌ Manual hook patch rejected. Reverting changes..."
+                mv -f fs/{exec,open,read_write,stat}.c.orig fs/ 2>/dev/null || true
+                mv -f drivers/input/input.c.orig drivers/input/ 2>/dev/null || true
+                mv -f drivers/tty/pty.c.orig drivers/tty/ 2>/dev/null || true
+        fi
         fi
     fi
     config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_KSU_MANUAL_HOOK
@@ -503,7 +503,7 @@ cd ..
 if [[ $BUILD_LKMS == "true" ]]; then
     mkdir lkm && cd lkm
     find "$HOME/out" -type f -name "*.ko" -exec cp {} . \; || true
-    [[ -n "$(ls -A ./*.ko 2> /dev/null)" ]] && zip -r9 "$HOME/lkm-$KERNEL_VERSION-$BUILD_DATE.zip" ./*.ko || echo "No LKMs found."
+    [[ -n "$(ls -A ./*.ko 2> /dev/null)" ]] && zip -r9 "$HOME/lkm-$KERNEL_VERSION-$BUILD_DATE.zip" ./*.ko || log "No LKMs found."
     cd ..
 fi
 
@@ -512,11 +512,9 @@ if [[ $STATUS == "STABLE" ]] || [[ $UPLOAD2GH == "true" ]]; then
     TAG="$BUILD_DATE"
     RELEASE_MESSAGE="${ZIP_NAME%.zip}"
     URL="$GKI_RELEASES_REPO/releases/$TAG"
-    GITHUB_USERNAME=$(echo "$GKI_RELEASES_REPO" | awk -F'https://github.com/' '{print $2}' | awk -F'/' '{print $1}')
-    REPO_NAME=$(echo "$GKI_RELEASES_REPO" | awk -F'https://github.com/' '{print $2}' | awk -F'/' '{print $2}')
 
     # Clone repository
-    git clone --depth=1 "https://github.com/${GITHUB_USERNAME}/${REPO_NAME}.git" "$HOME/rel" || {
+    git clone --depth=1 "$GKI_RELEASES_REPO" "$HOME/rel" || {
         error "❌ Failed to clone repository"
     }
 
@@ -540,7 +538,9 @@ if [[ $STATUS == "STABLE" ]] || [[ $UPLOAD2GH == "true" ]]; then
 
     send_msg "📦 [$RELEASE_MESSAGE]($URL)"
 else
-    send_msg "✅ Build Succeeded"
+    send_msg "✅ Build Succeeded
+
+    Download link: \`$NIGHTLY_LINK\`"
 fi
 
 exit 0
