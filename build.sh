@@ -334,7 +334,7 @@ fi
 if grep -q 'echo "+"' scripts/setlocalversion; then
     sed -i 's/echo "+"/# echo "+"/g' scripts/setlocalversion
 fi
-config --file $CONFIG_FILE --set-str LOCALVERSION "-$KERNEL_NAME"
+config --file "$CONFIG_FILE" --set-str LOCALVERSION "--" "-$KERNEL_NAME"
 
 text=$(
     cat << EOF
