@@ -222,8 +222,8 @@ fi
 
 # Apply extra tmpfs config
 log "Applying extra tmpfs config..."
-config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_TMPFS_XATTR
-config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_TMPFS_POSIX_ACL
+config --file $CONFIG_FILE --enable CONFIG_TMPFS_XATTR
+config --file $CONFIG_FILE --enable CONFIG_TMPFS_POSIX_ACL
 
 # KernelSU setup
 # Remove KernelSU in driver in kernel source if exist
@@ -249,9 +249,9 @@ fi
 
 # Apply config for KernelSU manual hook (Requires supported KernelSU)
 if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
-    config --file $config_file --enable CONFIG_KSU_MANUAL_HOOK
-    config --file $config_file --disable CONFIG_KSU_WITH_KPROBE
-    config --file $config_file --disable CONFIG_KSU_SUSFS_SUS_SU
+    config --file $CONFIG_FILE --enable CONFIG_KSU_MANUAL_HOOK
+    config --file $CONFIG_FILE --disable CONFIG_KSU_WITH_KPROBE
+    config --file $CONFIG_FILE --disable CONFIG_KSU_SUSFS_SUS_SU
 
     if [[ $USE_KSU_OFC == "true" ]]; then
         error "Official KernelSU has dropped manual hook support. Exiting..."
@@ -268,9 +268,9 @@ if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
                 [[ -f "$file.orig" ]] && mv -f "$file.orig" "$file"
             done
             log "Using KPROBE HOOK instead..."
-            config --file $config_file --disable CONFIG_KSU_MANUAL_HOOK
-            config --file $config_file --enable CONFIG_KSU_WITH_KPROBE
-            config --file $config_file --enable CONFIG_KSU_SUSFS_SUS_SU
+            config --file $CONFIG_FILE --disable CONFIG_KSU_MANUAL_HOOK
+            config --file $CONFIG_FILE --enable CONFIG_KSU_WITH_KPROBE
+            config --file $CONFIG_FILE --enable CONFIG_KSU_SUSFS_SUS_SU
 
         fi
     fi
@@ -334,8 +334,7 @@ fi
 if grep -q 'echo "+"' scripts/setlocalversion; then
     sed -i 's/echo "+"/# echo "+"/g' scripts/setlocalversion
 fi
-config --file arch/arm64/configs/$KERNEL_DEFCONFIG \
-    --set-str LOCALVERSION "-$KERNEL_NAME"
+config --file $CONFIG_FILE --set-str LOCALVERSION "-$KERNEL_NAME"
 
 text=$(
     cat << EOF
