@@ -96,11 +96,11 @@ done
 # 	MAIN
 # ---------------
 
-# Import configuration
-source ./config.sh
-
 # Setup workdir variable
 workdir=$(pwd)
+
+# Import configuration
+source ./config.sh
 
 # Set up timezone
 sudo timedatectl set-timezone $TZ
