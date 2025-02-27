@@ -114,7 +114,8 @@ log "Downloading kernel patch from (WildPlusKernel/kernel-patches) to $workdir/w
 git clone --depth=1 https://github.com/WildPlusKernel/kernel_patches wildplus_patches
 # Kernel source
 log "Cloning kernel source from ($KERNEL_REPO) to $workdir/common"
-git clone --depth=1 https://github.com/$KERNEL_REPO -b $KERNEL_BRANCH common
+echo "Cloning into 'common'..."
+git clone -q --depth=1 https://github.com/$KERNEL_REPO -b $KERNEL_BRANCH common
 
 # Extract kernel version
 cd $workdir/common
@@ -177,7 +178,7 @@ if [[ ! -x $CLANG_PATH/bin/clang || ! -f $CLANG_PATH/VERSION || "$(cat $CLANG_PA
         mkdir -p "$CLANG_PATH"
         wget -q "$CLANG_URL" && tar -xf ./*.tar.* -C "$CLANG_PATH/" && rm ./*.tar.*
     else
-        git clone --depth=1 -b "$CUSTOM_CLANG_BRANCH" "$CLANG_URL" "$CLANG_PATH"
+        git clone -q --depth=1 -b "$CUSTOM_CLANG_BRANCH" "$CLANG_URL" "$CLANG_PATH"
     fi
 
     echo "$CLANG_INFO" > "$CLANG_PATH/VERSION"
