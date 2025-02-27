@@ -246,6 +246,36 @@ if [[ $USE_KSU == true ]]; then
     fi
 fi
 
+# Apply config for KernelSU manual hook (Requires supported KernelSU)
+if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
+    config --file $config_file --enable CONFIG_KSU_MANUAL_HOOK
+    config --file $config_file --disable CONFIG_KSU_WITH_KPROBE
+    config --file $config_file --disable CONFIG_KSU_SUSFS_SUS_SU
+
+    if [[ $USE_KSU_OFC == "true" ]]; then
+        error "Official KernelSU has dropped manual hook support. Exiting..."
+    fi
+
+    if grep -q "CONFIG_KSU" fs/exec.c; then
+        log "Manual hook code already present in fs/exec.c. Skipping patch..."
+    else
+        log "Applying manual-hook patch to the kernel source..."
+        if ! patch -p1 < "$workdir/wildplus_patches/new_hooks.patch"; then
+            log "❌ Patch rejected. Reverting changes..."
+            for file in fs/exec.c fs/open.c fs/read_write.c fs/stat.c \
+                        drivers/input/input.c drivers/tty/pty.c; do
+                [[ -f "$file.orig" ]] && mv -f "$file.orig" "$file"
+            done
+            log "Using KPROBE HOOK instead..."
+            config --file $config_file --disable CONFIG_KSU_MANUAL_HOOK
+            config --file $config_file --enable CONFIG_KSU_WITH_KPROBE
+            config --file $config_file --enable CONFIG_KSU_SUSFS_SUS_SU
+
+        fi
+    fi
+fi
+
+
 # Install KernelSU driver
 cd $workdir
 if [[ $USE_KSU == true ]]; then
@@ -296,30 +326,6 @@ elif [[ $USE_KSU == "true" ]] && [[ $USE_KSU_SUSFS == "true" ]]; then
 fi
 
 cd $workdir/common
-# Apply config for KernelSU manual hook (Need supported source on both kernel and KernelSU)
-if [[ $KSU_USE_MANUAL_HOOK == "true" ]]; then
-    [[ $USE_KSU_OFC == "true" ]] && (
-        error "Official KernelSU has dropped manual hook support. exiting..."
-    )
-    if grep -q "CONFIG_KSU" fs/exec.c; then
-        log "Manual hook codes found in fs/exec.c..."
-    else
-        log "Patching manual-hook code to the kernel source..."
-        if ! patch -p1 < "$workdir/wildplus_patches/new_hooks.patch"; then
-            log "❌ Manual hook patch rejected. Reverting changes..."
-            mv -f fs/exec.c.orig fs/exec.c
-            mv -f fs/open.c.orig fs/open.c
-            mv -f fs/read_write.c.orig fs/read_write.c
-            mv -f fs/stat.c.orig fs/stat.c
-            mv -f drivers/input/input.c.orig drivers/input/input.c
-            mv -f drivers/tty/pty.c.orig drivers/tty/pty.c
-        fi
-    fi
-    config --file arch/arm64/configs/$KERNEL_DEFCONFIG --enable CONFIG_KSU_MANUAL_HOOK
-    config --file arch/arm64/configs/$KERNEL_DEFCONFIG --disable CONFIG_KSU_WITH_KPROBE
-    config --file arch/arm64/configs/$KERNEL_DEFCONFIG --disable CONFIG_KSU_SUSFS_SUS_SU
-fi
-
 # Remove unnecessary code from scripts/setlocalversion
 if grep -q '[-]dirty' scripts/setlocalversion; then
     sed -i 's/-dirty//' scripts/setlocalversion
@@ -359,7 +365,7 @@ CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 KERNEL_IMAGE=$workdir/out/arch/arm64/boot/Image
 
 # Build GKI
-cd "$workdir/common"
+cd $workdir/common
 
 build_kernel() {
     log "Building kernel..."
