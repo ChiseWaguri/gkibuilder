@@ -177,7 +177,7 @@ if [[ ! -x $CLANG_PATH/bin/clang || ! -f $CLANG_PATH/VERSION || "$(cat $CLANG_PA
         mkdir -p "$CLANG_PATH"
         wget -q "$CLANG_URL" && tar -xf ./*.tar.* -C "$CLANG_PATH/" && rm ./*.tar.*
     else
-        git clone --depth=1 --branch "$CUSTOM_CLANG_BRANCH" "$CLANG_URL" "$CLANG_PATH"
+        git clone --depth=1 -b "$CUSTOM_CLANG_BRANCH" "$CLANG_URL" "$CLANG_PATH"
     fi
 
     echo "$CLANG_INFO" > "$CLANG_PATH/VERSION"
