@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Kernel name
-KERNEL_NAME="Melt-v3.6.3-Chise+""
+KERNEL_NAME="Melt-v3.6.3-Chise+"
 
 # GKI Version
 GKI_VERSION="android12-5.10"
